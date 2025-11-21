@@ -131,6 +131,19 @@ You can inspect training metrics (reward curves, loss values, episode lengths) u
 3.  **View Metrics:**
     Open your browser to the URL shown (usually `http://localhost:6006/`).
 
+## Debugging on Burst
+
+Burst storage is accessible only from a job running on burst, not from the burst login node. The provided scripts do not automatically synchronize error logs back to your home directory on Greene. However, you will need access to these logs to debug failed jobs. These error logs differ from the logs in the previous section.
+
+The suggested way to inspect these logs is via the Open OnDemand web interface:
+
+1.  Navigate to [https://ood-burst-001.hpc.nyu.edu](https://ood-burst-001.hpc.nyu.edu).
+2.  Select **Files** > **Home Directory** from the top menu.
+3.  You will see a list of files, including your `.err` log files.
+4.  Click on any `.err` file to view its content directly in the browser.
+
+> **Important:** Do not modify anything inside the `rob6323_go2_project` folder on burst storage. This directory is managed by the job scripts, and manual changes may cause synchronization issues or job failures.
+
 ## Project scope reminder
 
 - The assignment expects you to go beyond velocity tracking by adding principled reward terms (posture stabilization, foot clearance, slip minimization, smooth actions, contact and collision penalties), robustness via domain randomization, and clear benchmarking metrics for evaluation as described in the course guidelines.  

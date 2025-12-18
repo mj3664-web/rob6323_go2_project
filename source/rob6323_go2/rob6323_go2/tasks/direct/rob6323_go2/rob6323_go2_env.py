@@ -67,7 +67,7 @@ class Rob6323Go2Env(DirectRLEnv):
             ]
         }
 
-        # ---- action‑rate history (for smoothness penalty) ----
+        # ---- action-rate history (for smoothness penalty) ----
         # shape: (num_envs, action_dim, history_len=3)
         self.last_actions = torch.zeros(
             self.num_envs,
@@ -237,7 +237,7 @@ class Rob6323Go2Env(DirectRLEnv):
         # torque magnitude penalty
         torque_l2 = torch.sum(self.last_torques ** 2, dim=1)
 
-        # ---------------- Gait‑related terms ----------------
+        # ---------------- Gait-related terms ----------------
         self._step_contact_targets()
         rew_raibert_heuristic = self._reward_raibert_heuristic()
         (
@@ -385,9 +385,14 @@ class Rob6323Go2Env(DirectRLEnv):
         extras = {}
         for key in self._episode_sums.keys():
             episodic_sum_avg = torch.mean(self._episode_sums[key][env_ids])
-            extras["Episode_Reward/" + key] = (
-                episodic_sum_avg / self.max_episode_length_s
-            )
+
+            # send reward terms vs diagnostics to separate groups
+            if key.startswith("diag_"):
+                prefix = "Episode_Diag/"
+            else:
+                prefix = "Episode_Reward/"
+
+            extras[prefix + key] = episodic_sum_avg / self.max_episode_length_s
             self._episode_sums[key][env_ids] = 0.0
 
         self.extras["log"] = {}
@@ -490,7 +495,7 @@ class Rob6323Go2Env(DirectRLEnv):
             self.gait_indices + phases,
         ]
 
-        # store per‑foot indices in [0, 1)
+        # store per-foot indices in [0, 1)
         self.foot_indices = torch.remainder(
             torch.stack(foot_indices_list, dim=1), 1.0
         )
@@ -595,7 +600,7 @@ class Rob6323Go2Env(DirectRLEnv):
         return reward
 
     def _reward_feet_and_contacts(self) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        """Feet clearance and contact‑pattern penalties + toe‑drag diagnostic."""
+        """Feet clearance and contact-pattern penalties + toe-drag diagnostic."""
         foot_pos = self.foot_positions_w
         base_height = self.robot.data.root_pos_w[:, 2].unsqueeze(1)
 
@@ -611,7 +616,7 @@ class Rob6323Go2Env(DirectRLEnv):
         feet_clearance_error = (rel_foot_height - desired_height) ** 2
         rew_feet_clearance = torch.sum(feet_clearance_error, dim=1)
 
-        # toe‑drag diagnostic: how much swing feet fall below desired height
+        # toe-drag diagnostic: how much swing feet fall below desired height
         swing_mask = 1.0 - self.desired_contact_states
         toe_deficit = torch.clamp(desired_height - rel_foot_height, min=0.0)
         diag_toe_drag = torch.sum(swing_mask * toe_deficit, dim=1)
@@ -629,7 +634,7 @@ class Rob6323Go2Env(DirectRLEnv):
 
     def _reward_feet_slip(self) -> torch.Tensor:
         """Penalize horizontal foot slip while in contact."""
-        # world‑frame linear velocities of feet: (num_envs, 4, 3)
+        # world-frame linear velocities of feet: (num_envs, 4, 3)
         foot_vel_w = self.robot.data.body_lin_vel_w[:, self._feet_ids, :]
 
         # horizontal components (x,y)

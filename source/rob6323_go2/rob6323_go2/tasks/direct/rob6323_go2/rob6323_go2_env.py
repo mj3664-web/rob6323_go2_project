@@ -47,7 +47,7 @@ class Rob6323Go2Env(DirectRLEnv):
                 "track_lin_vel_xy_exp",
                 "track_ang_vel_z_exp",
                 "rew_action_rate",
-                "torque_l2",
+                "torque_l2", # new
                 "raibert_heuristic",
                 "orient",
                 "lin_vel_z",
@@ -55,10 +55,10 @@ class Rob6323Go2Env(DirectRLEnv):
                 "ang_vel_xy",
                 "feet_clearance",
                 "tracking_contacts_shaped_force",
-                "feet_slip",
-                "knee_collision",
+                "feet_slip", # new 
+                "knee_collision", # new
                 # diagnostics (NOT part of reward)
-                "diag_slip",
+                "diag_slip", 
                 "diag_toe_drag",
                 "diag_foot_timing",
                 "diag_jerk",
@@ -150,7 +150,7 @@ class Rob6323Go2Env(DirectRLEnv):
         # clone & replicate
         self.scene.clone_environments(copy_from_source=False)
 
-        # CPU collision filtering
+        # Explicit CPU collision filtering
         if self.device == "cpu":
             self.scene.filter_collisions(global_prim_paths=[])
 

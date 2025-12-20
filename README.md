@@ -377,6 +377,96 @@ We replaced the old slip metric logic with a dedicated reward helper function. T
         rew_slip = torch.sum(contact_mask * foot_vel_xy_mag, dim=1)
         
         return rew_slip
+```
+
+# Now consider the following changes made in the original code for the bonus implementation.
+If you wish to run and confirm the bonus portion, copy contents of the `bonus_rob6323_go2_env_cfg_improved_FRICTION.py` -> `rob6323_go2_env_config.py`
+
+and 
+
+`bonus_rob6323_go2_env_improved_FRICTION.py` -> `rob6323_go2_env.py`
+
+files respectively. 
+
+then simply run the ./train.sh from the home directory of this project.
+
+
+## The specific changes made to the files as opposed to the previously updated code are as follows:
+
+In the config file:
+
+### Implementation Comparison
+
+| Feature | Non-Bonus Implementation | Bonus Implementation | Change Type |
+| :--- | :--- | :--- | :--- |
+| **Class Decorator** | None | `@configclass` | **Infrastructure** |
+| **Actuator Dynamics** | Fixed / None | Randomization ranges added | **Sim-to-Real / Robustness** |
+| **Reward: DOF Velocity** | `-0.005` | `-0.0005` | **Tuning (Relaxed Constraint)** |
+
+---
+
+### Detailed Changes & Reasoning
+
+#### 1. Configuration Registration (`@configclass`)
+* **Change:** The **Bonus** implementation adds the `@configclass` decorator to the class definition.
+* **Reasoning:** This decorator is likely required by the configuration system (common in frameworks like Isaac Lab/Orbit) to properly register the class. It ensures the configuration is parsed correctly, allows for type-checking, and enables command-line overrides. Without it, the config might not load or merge correctly in a complex training pipeline.
+
+#### 2. Domain Randomization (Actuator Friction)
+* **Change:** The **Bonus** implementation adds the following lines under the PD controller section:
+    ```python
+    actuator_viscous_range = (0.0, 0.3)   # mu_v ~ U(0, 0.3)
+    actuator_stiction_range = (0.0, 2.5)  # F_s ~ U(0, 2.5)
+    ```
+* **Reasoning:** This introduces **Domain Randomization**.
+    * In the *Non-Bonus* version, friction is likely static or ideal.
+    * In the *Bonus* version, the environment randomizes the viscous friction and stiction (static friction) of the joints for every episode. This prevents the policy from overfitting to a perfect physics simulator and makes it robust enough to transfer to a real robot (Sim-to-Real), where joint friction varies due to wear, temperature, and manufacturing.
+
+#### 3. DOF Velocity Penalty Reduction
+* **Change:** `dof_vel_reward_scale` was changed from `-0.005` to `-0.0005`.
+* **Reasoning:** The penalty for joint velocities was **reduced by a factor of 10**.
+    * **Old Value (`-0.005`):** A higher penalty heavily discourages rapid joint movement. This often results in the robot moving sluggishly or "freezing" to maximize rewards, preventing it from learning dynamic gaits like trotting or galloping.
+    * **New Value (`-0.0005`):** By lowering this penalty, the robot is allowed to move its legs faster. This encourages more agile and energetic locomotion while still maintaining a small penalty to prevent jittery, uncontrolled oscillations.
+
+
+In the main go2_env class:
+
+## Change Log & Code Review
+
+### 1. New Actuator Friction Parameters
+**Change:**
+Added initialization for `_mu_v` (viscous friction) and `_F_s` (stiction/static friction) tensors.
+```python
+# ---- actuator friction parameters (randomized per episode) ----
+# Scalars per-environment, broadcast across joints
+self._mu_v = torch.zeros(self.num_envs, 1, device=self.device)  # viscous coeff
+self._F_s = torch.zeros(self.num_envs, 1, device=self.device)   # stiction coeff
+```
+
+### Reasoning:
+- High-Fidelity Actuator Modeling: Standard physics engines often simulate ideal torque sources. Real actuators, however, suffer from internal friction. _mu_v models damping (velocity-dependent resistance) and _F_s models stiction (constant resistance), allowing the simulation to mimic real-world motor limitations.
+- Domain Randomization (Sim-to-Real): By defining these as tensors of shape (num_envs, 1), the environment is set up to randomize these friction coefficients per episode. Training a policy against varying friction profiles significantly improves its robustness when deployed on the physical Go2 robot, where joint friction varies due to wear, temperature, and manufacturing tolerances.
+
+### 2. Change Log of apply action
+The `_apply_action` method has been upgraded from a simple **Ideal PD Controller** to a **Physically Grounded Actuator Model**.
+
+1.  **Introduced `tau_stiction` (Static Friction):**
+    * Added a term to model the resistance force that exists at zero or near-zero velocities.
+    * Uses `tanh(qd / 0.1)` as a differentiable approximation of the sign function to ensure smooth gradient flow during training.
+
+2.  **Introduced `tau_viscous` (Viscous Damping):**
+    * Added a velocity-dependent damping term (`mu_v * qd`).
+    * Models the back-EMF and internal mechanical damping of the gearbox.
+
+3.  **Net Torque Calculation:**
+    * The final torque sent to the robot is now $\tau_{cmd} = \tau_{PD} - (\tau_{stiction} + \tau_{viscous})$.
+    * This effectively reduces the torque available to drive the robot, forcing the policy to command stronger actions to overcome internal motor resistance.
+
+### Reasoning
+* **Sim-to-Real Gap Reduction:** In ideal simulations, motors react instantly and perfectly. Real hardware suffers from friction. Without this model, policies often learn to output tiny, high-frequency twitches that work in sim but do nothing on a real robot due to stiction.
+* **Reality Modeling:** The combination of **Coulomb friction** (stiction) and **Viscous friction** (damping) creates a standard DC motor model.
+    * **Stiction** ensures the robot doesn't "slide" unnaturally when it should be holding still.
+    * **Damping** prevents the "shaking" often seen in RL policies by penalizing high-velocity joint jitter.
+
 
 
 

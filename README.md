@@ -409,7 +409,7 @@ In the config file:
 
 #### 1. Configuration Registration (`@configclass`)
 * **Change:** The **Bonus** implementation adds the `@configclass` decorator to the class definition.
-* **Reasoning:** This decorator is likely required by the configuration system (common in frameworks like Isaac Lab/Orbit) to properly register the class. It ensures the configuration is parsed correctly, allows for type-checking, and enables command-line overrides. Without it, the config might not load or merge correctly in a complex training pipeline.
+* **Reasoning:** This decorator is required by the configuration system (common in frameworks like Isaac Lab/Orbit) to properly register the class. It ensures the configuration is parsed correctly, allows for type-checking, and enables command-line overrides. Without it, the config will not load or merge correctly in a complex training pipeline.
 
 #### 2. Domain Randomization (Actuator Friction)
 * **Change:** The **Bonus** implementation adds the following lines under the PD controller section:
@@ -418,7 +418,7 @@ In the config file:
     actuator_stiction_range = (0.0, 2.5)  # F_s ~ U(0, 2.5)
     ```
 * **Reasoning:** This introduces **Domain Randomization**.
-    * In the *Non-Bonus* version, friction is likely static or ideal.
+    * In the *Non-Bonus* version, friction is static or ideal.
     * In the *Bonus* version, the environment randomizes the viscous friction and stiction (static friction) of the joints for every episode. This prevents the policy from overfitting to a perfect physics simulator and makes it robust enough to transfer to a real robot (Sim-to-Real), where joint friction varies due to wear, temperature, and manufacturing.
 
 #### 3. DOF Velocity Penalty Reduction
@@ -428,9 +428,7 @@ In the config file:
     * **New Value (`-0.0005`):** By lowering this penalty, the robot is allowed to move its legs faster. This encourages more agile and energetic locomotion while still maintaining a small penalty to prevent jittery, uncontrolled oscillations.
 
 
-In the main go2_env class:
-
-## Change Log & Code Review
+## In the main go2_env class, Change Log & Code Review
 
 ### 1. New Actuator Friction Parameters
 **Change:**
